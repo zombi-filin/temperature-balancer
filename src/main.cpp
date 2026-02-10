@@ -1,11 +1,19 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Ticker.h>
-#include <DS18B20.h>
 #include "DS3231.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_ST7735.h"
+#include <SPI.h>
 
 #define LED_PIN			16
 #define BLINK_DELAY_MS	500
+
+#define TFT_CS			D8
+#define TFT_RST			D4
+#define TFT_DC			D3
+#define TFT_SDA			D7
+#define TFT_SCK			D5
 
 DS3231_datetime_t datetime;
 
@@ -13,6 +21,9 @@ Ticker ticker;
 
 uint16_t blink_ticks;
 uint16_t time_echo;
+
+//Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_SDA, TFT_SCK, TFT_RST);
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 bool inc100ms_tick(uint16_t *ticks, uint16_t limit)
 {
@@ -53,7 +64,13 @@ void setup()
 
 	// Настройка порта монитора
 	Serial.begin(74880);
-  
+	
+	tft.initR(INITR_REDTAB);
+	//tft.invertDisplay(true);
+	//tft.setRotation(1);
+	//tft.fillScreen(ST7735_BLUE);
+
+
 	//
 	pinMode(LED_PIN, OUTPUT);
 
