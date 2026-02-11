@@ -14,11 +14,20 @@ uint8_t bcdToDec(uint8_t val)
 
 void DS3231_get_time(TwoWire *wire, DS3231_datetime_t *datetime)
 {
+    uint8_t read_data;
+    uint8_t h_part;
+    uint8_t l_part;
+
     wire->beginTransmission(DS3231_I2C_ADDRESS);
-    wire->write(0x00);
+    wire->write(0xD1);
     wire->endTransmission();
     wire->requestFrom(DS3231_I2C_ADDRESS, 7);
-    datetime->second = bcdToDec(wire->read() & 0x7f);
+    
+    read_data = wire->read();
+    l_part = read_data & 0x0F;
+    h_part = (read_data >> 4) & 0x07;
+    datetime->second = (h_part * 10) + l_part;
+
     datetime->minute = bcdToDec(wire->read());
     datetime->hour = bcdToDec(wire->read() & 0x3f);
     datetime->day_week = bcdToDec(wire->read());

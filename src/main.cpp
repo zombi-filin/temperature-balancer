@@ -43,13 +43,10 @@ void tick_100ms()
 	
 	if (inc100ms_tick(&time_echo, 1000))
 	{
-		Serial.print("Time ");
-		Serial.print(datetime.hour, DEC);
-		Serial.print(":");
-		Serial.print(datetime.minute, DEC);
-		Serial.print(":");
-		Serial.print(datetime.second, DEC);
-		Serial.println();
+		tft.setTextColor(ST7735_WHITE);
+		tft.setTextSize(1);
+		tft.setCursor(20, 25);
+		tft.printf("%i:%i:%i",datetime.hour, datetime.minute, datetime.second);
 	}
 
 	// blink
@@ -65,10 +62,10 @@ void setup()
 	// Настройка порта монитора
 	Serial.begin(74880);
 	
-	tft.initR(INITR_REDTAB);
-	//tft.invertDisplay(true);
-	//tft.setRotation(1);
-	//tft.fillScreen(ST7735_BLUE);
+	
+	tft.initR(INITR_BLACKTAB);
+	tft.setRotation(3);
+	tft.fillScreen(ST7735_BLACK);
 
 
 	//
