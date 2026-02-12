@@ -8,7 +8,7 @@
 #define DS3231_I2C_ADDRESS  0x68
 typedef struct 
 {
-    uint8_t year;       // Год
+    uint16_t year;       // Год
     uint8_t month;      // Месяц
     uint8_t day_month;  // День 1-31
     uint8_t day_week;   // День недели 1=Воскресенье, 7=Суббота

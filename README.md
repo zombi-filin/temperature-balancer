@@ -36,8 +36,8 @@
 
 ### Термодатчик DS18B20
 
-| DS18B20 | NodeMCU |
-|---|---|
-| VCC | 3V3 ( +3.3 ) |
-| DATA | SD3 ( GPIO10 )  |
-| GND | GND |
+| DS18B20 | NodeMCU | |
+|---|---|---|
+| VCC | GND ||
+| DATA | SD3 ( GPIO10 ) | DATA --- 4k7 -- 3V3  |
+| GND | GND ||
