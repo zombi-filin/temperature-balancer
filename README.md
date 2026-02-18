@@ -20,10 +20,10 @@
 
 | SD | NodeMCU |
 |---|---|
-| SD_CS ||
-| SD_MOSI ||
-| SD_MISO ||
-| SD_SCK ||
+| SD_CS | RX ( GPIO3)  |
+| SD_MOSI | D7 ( GPIO13 ) |
+| SD_MISO | D6 ( GPIO12 )|
+| SD_SCK | D5 ( GPIO14 ) |
 
 ### Часы реального времени DS3231
 
