@@ -1,19 +1,11 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <Ticker.h>
-#include "DS3231.h"
-#include "Adafruit_GFX.h"
-#include "Adafruit_ST7735.h"
-#include <SPI.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include "ESP8266WiFi.h"
-#include "ESP8266WebServer.h"
+#include "main.h"
 
 #define LED_PIN					16
 #define BLINK_DELAY_MS			500
 
 #define DEFAULT_TEXT_COLOR		ST7735_WHITE
+#define COLD_TEXT_COLOR			ST7735_BLUE
+#define HOT_TEXT_COLOR			ST7735_RED
 #define DEFAULT_TEXT_BG_COLOR	ST7735_BLACK
 
 #define TFT_CS					D8
@@ -23,64 +15,93 @@
 #define TFT_SCK					D5
 
 #define ONE_WIRE_BUS			10
+#define DS18B20MODEL			0x28
 
 DS3231_datetime_t datetime;
 
-Ticker ticker;
-
-uint16_t blink_ticks;
-uint16_t time_echo;
+bool blink_state = false;
+step_e step;
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
-ESP8266WebServer server(80);
+ESP8266WebServer web_server(80);
 
 float temp_C = 0;
-int device_count = 0;
+uint8_t temp_min = 27;
+uint8_t temp_max = 30;
 
-const char* ssid = "Balancer-WiFi";
+String wifi_ssid = "Balancer-WiFi";
+String wifi_password = "81726354";
 
-bool inc100ms_tick(uint16_t *ticks, uint16_t limit)
+/* Настройки IP адреса */
+IPAddress local_ip(192, 168, 88, 1);
+IPAddress subnet(255, 255, 255 ,0);
+
+uint16_t delay_millis = 0;
+unsigned long time_millis = 0;
+
+void blink_toggle()
 {
-	(*ticks) += 100;
-
-	if ((uint16_t)(*ticks) >= limit)
-	{
-		(*ticks) = 0;
-		return true;
-	}
-	return false;
+	digitalWrite(LED_PIN, blink_state);
+	blink_state = !blink_state;
 }
 
-void tick_100ms()
+void screen_display()
 {
-	DS3231_get_time(&Wire, &datetime);
+	tft.setTextColor(DEFAULT_TEXT_COLOR, DEFAULT_TEXT_BG_COLOR);
+	tft.setTextSize(1);
+	tft.setCursor(20, 5);
+	tft.printf("%02i.%02i.%4i  %02i:%02i:%02i", datetime.day_month, datetime.month, datetime.year, datetime.hour, datetime.minute, datetime.second);
 
-	if (inc100ms_tick(&time_echo, 1000))
+	tft.setCursor(10,113);
+	tft.printf("%d.%d.%d.%d   %s", local_ip[0], local_ip[1], local_ip[2], local_ip[3], wifi_password);
+
+	uint16_t circle_color = DEFAULT_TEXT_BG_COLOR;
+
+	tft.setTextSize(6);
+
+	if (temp_C > temp_max)
 	{
-		if (device_count > 0)
-		{
-			sensors.requestTemperatures();
-			temp_C = sensors.getTempCByIndex(0);
-		}
-		
+		tft.setTextColor(HOT_TEXT_COLOR, DEFAULT_TEXT_BG_COLOR);
+		circle_color = COLD_TEXT_COLOR;
+	}
+	else if (temp_C < temp_min)
+	{
+		tft.setTextColor(COLD_TEXT_COLOR, DEFAULT_TEXT_BG_COLOR);			
+		circle_color = HOT_TEXT_COLOR;
+	}
+	else
+	{
 		tft.setTextColor(DEFAULT_TEXT_COLOR, DEFAULT_TEXT_BG_COLOR);
-		tft.setTextSize(1);
-		tft.setCursor(20, 5);
-
-		tft.printf("%02i.%02i.%4i  %02i:%02i:%02i", datetime.day_month, datetime.month, datetime.year, datetime.hour, datetime.minute, datetime.second);
-
-		tft.setTextSize(5);
-		tft.setCursor(25, 28);
-		tft.printf("%.1f", temp_C);
 	}
 
-	// blink
-	digitalWrite(LED_PIN, (blink_ticks >= BLINK_DELAY_MS));
-	inc100ms_tick(&blink_ticks, BLINK_DELAY_MS * 2);
+	tft.fillCircle(80, 90, 12, circle_color);
+
+	tft.setCursor(10, 21);
+	tft.printf("%.1f", temp_C);
+
+	tft.setTextSize(4);
+
+	tft.setCursor(10, 75);
+	tft.setTextColor(COLD_TEXT_COLOR,DEFAULT_TEXT_BG_COLOR);
+	tft.printf("%d", temp_min);
+
+	tft.setCursor(105, 75);
+	tft.setTextColor(HOT_TEXT_COLOR,DEFAULT_TEXT_BG_COLOR);
+	tft.printf("%d", temp_max);
+}
+
+void handle_NotFound()
+{
+	web_server.send(200, "text/plain", "Not found");
+}
+
+void handle_root()
+{
+	web_server.send(200, "text/html", HTML_main_page(&datetime, temp_C));
 }
 
 void setup()
@@ -89,30 +110,69 @@ void setup()
 	Serial.begin(74880);
 
 	// Инициализация I2C
-	Serial.println("Init wire");
 	Wire.begin(PIN_WIRE_SDA, PIN_WIRE_SCL);
+	DS3231_get_time(&Wire, &datetime);
+	Serial.println("Init wire");
 
-	Serial.println("Init sensor");
-	sensors.begin();
-	device_count = sensors.getDeviceCount();
-
-	
-
-	
-	Serial.println("Init TFT");
+	// Инициализация TFT
 	tft.initR(INITR_BLACKTAB);
 	tft.setRotation(3);
 	tft.fillScreen(DEFAULT_TEXT_BG_COLOR);
+	Serial.println("Init TFT");
 
+	// Инициализация термодатчика
+	sensors.begin();
+	sensors.setResolution(9);	
+	Serial.println("Init temp sensor");
+
+	// Инициализация WiFi
+	WiFi.mode(WIFI_AP);
+	WiFi.softAPConfig(local_ip, local_ip, subnet);
+	WiFi.softAP(wifi_ssid, wifi_password);
+	Serial.println("Init Wi-Fi");
+
+	// Инициализация web сервера
+	web_server.on("/", handle_root);
+	web_server.onNotFound(handle_NotFound);
+	web_server.begin();
+	Serial.println("Init web server");
+	delay(100);
 
 	//
 	pinMode(LED_PIN, OUTPUT);
 
 	//
-	ticker.attach_ms(100, tick_100ms);
+	time_millis = millis();
+	step = READ_TIME;
 }
 
 void loop()
 {
-
+	web_server.handleClient();
+	
+	uint16_t delta = millis() - time_millis;
+	
+	if (delta >= 1000)
+	{
+		step = READ_TIME;
+		screen_display();
+		time_millis += 1000;
+	}
+	else if ((step == READ_TIME) && (delta >= 10))
+	{
+		DS3231_get_time(&Wire, &datetime);
+		step = REQUEST_TEMP;
+		blink_toggle();
+	}
+	else if ((step == REQUEST_TEMP) && (delta >= 50))
+	{
+		sensors.requestTemperatures();
+		step = GET_TEMP;
+	}
+	else if ((step == GET_TEMP) && (delta >= 200))
+	{
+		temp_C = sensors.getTempCByIndex(0);
+		step = IDLE;
+		blink_toggle();
+	}
 }
