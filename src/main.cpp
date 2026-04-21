@@ -30,8 +30,8 @@ DallasTemperature sensors(&oneWire);
 ESP8266WebServer web_server(80);
 
 float temp_C = 0;
-uint8_t temp_min = 27;
-uint8_t temp_max = 30;
+uint8_t temp_min = DEF_MIN_TEMP;
+uint8_t temp_max = DEF_MAX_TEMP;
 
 String wifi_ssid = "Balancer-WiFi";
 String wifi_password = "81726354";
@@ -99,15 +99,44 @@ void handle_NotFound()
 	web_server.send(200, "text/plain", "Not found");
 }
 
+void redirect_root()
+{
+	web_server.sendHeader("Location", "/",true);
+	web_server.send(302, "text/plane","");
+}
+
 void handle_root()
 {
-	web_server.send(200, "text/html", HTML_main_page(&datetime, temp_C));
+	web_server.send(200, "text/html", HTML_main_page(temp_min, temp_max));
+}
+
+void handle_save()
+{
+	redirect_root();
+}
+
+void handle_sync()
+{
+	redirect_root();
 }
 
 void setup()
 {
 	// Настройка порта монитора
 	Serial.begin(74880);
+
+	// Чтение значений из EEPROM
+	temp_min = EEPROM.read(MIN_TEMP_ADDR);
+	if ((temp_min < MINIMUM_TEMP) || (temp_min > MAXIMUM_TEMP))
+	{
+		temp_min = DEF_MIN_TEMP;
+	}
+
+	temp_max = EEPROM.read(MAX_TEMP_ADDR);
+	if ((temp_max < MINIMUM_TEMP) || (temp_max > MAXIMUM_TEMP))
+	{
+		temp_max = DEF_MAX_TEMP;
+	}
 
 	// Инициализация I2C
 	Wire.begin(PIN_WIRE_SDA, PIN_WIRE_SCL);
@@ -133,6 +162,8 @@ void setup()
 
 	// Инициализация web сервера
 	web_server.on("/", handle_root);
+	web_server.on("/save", handle_save);
+	web_server.on("/sync", handle_sync);
 	web_server.onNotFound(handle_NotFound);
 	web_server.begin();
 	Serial.println("Init web server");

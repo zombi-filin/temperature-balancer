@@ -2,6 +2,8 @@
 #define __MAIN_H__
 
 #include <Arduino.h>
+#include <EEPROM.h>
+
 #include <Ticker.h>
 #include <SPI.h>
 #include "Adafruit_GFX.h"
@@ -13,7 +15,7 @@
 #include "ESP8266WiFi.h"
 #include "ESP8266WebServer.h"
 #include "web_content.h"
-#include "cont.h"
+#include "consts.h"
 
 enum step_e {
 	IDLE = 0,
